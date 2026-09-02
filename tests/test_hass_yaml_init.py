@@ -6,7 +6,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
 from custom_components.auth_oidc import DOMAIN
-from custom_components.auth_oidc.config.const import ADDITIONAL_SCOPES
+from custom_components.auth_oidc.config.const import (
+    ADDITIONAL_SCOPES,
+    FEATURES,
+    FEATURES_DISABLE_DEVICE_CODE_LOGIN,
+)
 
 
 async def setup(hass: HomeAssistant, config: dict, expect_success: bool) -> bool:
@@ -30,6 +34,11 @@ async def setup(hass: HomeAssistant, config: dict, expect_success: bool) -> bool
             "client_id": "dummy",
             "discovery_url": "https://example.com/.well-known/openid-configuration",
             ADDITIONAL_SCOPES: "email phone",
+        },
+        {
+            "client_id": "dummy",
+            "discovery_url": "https://example.com/.well-known/openid-configuration",
+            FEATURES: {FEATURES_DISABLE_DEVICE_CODE_LOGIN: True},
         },
     ],
 )

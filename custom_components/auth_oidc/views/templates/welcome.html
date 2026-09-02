@@ -6,7 +6,11 @@
 {% block content %}
 {% import "_alert.html" as ui %}
 <div class="text-center">
-    {% if code %}
+    {% if device_code_disabled %}
+        <div id="device-code-disabled">
+            {% call ui.alert('error') %}Logging in from the Home Assistant app is not available, as login with a device code has been disabled on this server. Please login in your browser instead.{% endcall %}
+        </div>
+    {% elif code %}
         <div>
             <p id="device-instructions">Please login to Home Assistant on another device and enter this code when asked:</p>
             <div class="mt-4 text-3xl tracking-wide font-medium bg-input border border-divider rounded-lg py-4 px-6 inline-block" id="device-code">
