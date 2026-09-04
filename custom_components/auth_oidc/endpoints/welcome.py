@@ -29,6 +29,7 @@ class OIDCWelcomeView(HomeAssistantView):
         self.force_https = options.get("force_https")
         self.has_other_auth_providers = options.get("has_other_auth_providers")
         self.prefers_skipping = options.get("prefers_skipping")
+        self.disable_device_code_login = options.get("disable_device_code_login")
 
     async def _process_url(self, redirect_uri: str) -> tuple[str, bool]:
         """Processes the redirect URI to determine if we need setTokens and if this is mobile."""
@@ -137,7 +138,7 @@ class OIDCWelcomeView(HomeAssistantView):
         # Otherwise display the screen with either mobile sign in or the buttons
         # First generate code if mobile
         code = None
-        if is_mobile:
+        if is_mobile and not self.disable_device_code_login:
             # Create a code to login
             code = await self.oidc_provider.async_generate_device_code(state_id)
             if not code:
@@ -158,6 +159,9 @@ class OIDCWelcomeView(HomeAssistantView):
                 "name": self.name,
                 "other_link": other_link,
                 "code": code,
+                # Mobile clients can only login with a device code, so tell them
+                # when that option has been disabled
+                "device_code_disabled": is_mobile and self.disable_device_code_login,
             },
         )
         response.headers.update(cookie_header)

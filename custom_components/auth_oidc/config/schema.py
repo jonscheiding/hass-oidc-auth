@@ -16,6 +16,7 @@ from .const import (
     FEATURES_INCLUDE_GROUPS_SCOPE,
     FEATURES_FORCE_HTTPS,
     FEATURES_DEFAULT_REDIRECT,
+    FEATURES_DISABLE_DEVICE_CODE_LOGIN,
     CLAIMS,
     CLAIMS_DISPLAY_NAME,
     CLAIMS_USERNAME,
@@ -83,6 +84,14 @@ CONFIG_SCHEMA = vol.Schema(
                         # of other auth providers.
                         vol.Optional(
                             FEATURES_DEFAULT_REDIRECT, default=False
+                        ): vol.Coerce(bool),
+                        # The finish page shows the choice between continuing the
+                        # login on this device and approving the device code of
+                        # another device.
+                        # This flag removes the device code option and always
+                        # continues the login on the current device.
+                        vol.Optional(
+                            FEATURES_DISABLE_DEVICE_CODE_LOGIN, default=False
                         ): vol.Coerce(bool),
                     }
                 ),

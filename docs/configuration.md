@@ -154,6 +154,20 @@ auth_oidc:
 
 If you have this feature enabled and you would like to use the backup login, make sure to append `?skip_oidc_redirect=true` to your login URL. For example, if your HA is at `https://ha.example.com`, you can go to `https://ha.example.com/?skip_oidc_redirect=true` to see the HA username/password login screen.
 
+### Disabling device code login
+After you have logged in with your OIDC provider, you are returned to the finish screen ("Logged in!"), where you can choose between continuing the login on this device and approving the 6-digit device code of another device (as shown by the mobile apps). If you never login with a device code, you can disable that option, which also removes the finish screen, as continuing the login on the current device is then the only remaining choice:
+
+```yaml
+auth_oidc:
+  features:
+    disable_device_code_login: true
+```
+
+No device codes are handed out with this feature enabled, so the mobile apps will show a message that they cannot be used to login instead of a code. If you have another auth provider registered (such as the default Home Assistant login), the apps can still login with that provider from the same screen.
+
+> [!IMPORTANT]
+> With this feature enabled, you can no longer login with OIDC on the mobile apps, as they can only login through a device code. Only enable it if you login on your devices directly, for example if you only use Home Assistant in the browser.
+
 ### Forcing HTTPS
 First check if you are setting the header `X-Forwarded-Proto` in your proxy and if the [proxy settings for Home Assistant](https://www.home-assistant.io/integrations/http/#use_x_forwarded_for) are configured correctly. You should also check if IP addresses in your logs actually match the origin IP (instead of proxy IP). If you cannot find any mistakes, you may use the following config option to force HTTPS regardless:
 
@@ -238,6 +252,7 @@ Here's a table of all options that you can set:
 | `features.include_groups_scope`  | `boolean` | No       | `true`           | Include the 'groups' scope in the OIDC request. Set to `false` to exclude it. |
 | `features.force_https`  | `boolean` | No       | `false`           | Set to `true` to force all URLs generated to use `https` instead of automatically determining based on the request scheme or `X-Forwarded-Proto`. |
 | `features.default_redirect`  | `boolean` | No       | `false`           | Set to `true` to always skip the welcome screen (on desktop), regardless of if there are any other auth providers registered. |
+| `features.disable_device_code_login`  | `boolean` | No       | `false`           | Set to `true` to remove the option to approve the 6-digit device code of another device (as used by the mobile apps). The finish screen is then skipped and the login always continues on the current device. |
 | `claims.display_name`      | `string` | No       | `name`                     | The claim to use to obtain the display name.
 | `claims.username`         | `string` | No       | `preferred_username`                     | The claim to use to obtain the username.
 | `claims.groups`            | `string` | No       | `groups`                     | The claim to use to obtain the user's group(s). |

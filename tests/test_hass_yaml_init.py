@@ -10,6 +10,8 @@ from custom_components.auth_oidc.config.const import (
     ADDITIONAL_SCOPES,
     CLAIMS,
     CLAIMS_EXTRA,
+    FEATURES,
+    FEATURES_DISABLE_DEVICE_CODE_LOGIN,
 )
 
 
@@ -40,6 +42,7 @@ async def setup(hass: HomeAssistant, config: dict, expect_success: bool) -> bool
             "discovery_url": "https://example.com/.well-known/openid-configuration",
             ADDITIONAL_SCOPES: ["email"],
             CLAIMS: {CLAIMS_EXTRA: ["sub", "email"]},
+            FEATURES: {FEATURES_DISABLE_DEVICE_CODE_LOGIN: True},
         },
     ],
 )

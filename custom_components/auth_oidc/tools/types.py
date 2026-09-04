@@ -58,3 +58,6 @@ class OIDCWelcomeOptions(dict):
 
     # Does the user prefer to skip the welcome screen?
     prefers_skipping: bool
+
+    # Has the user disabled login with a device code?
+    disable_device_code_login: bool

@@ -29,6 +29,7 @@ from .config import (
     NETWORK,
     FEATURES_INCLUDE_GROUPS_SCOPE,
     FEATURES_DEFAULT_REDIRECT,
+    FEATURES_DISABLE_DEVICE_CODE_LOGIN,
     FEATURES_FORCE_HTTPS,
     REQUIRED_SCOPES,
 )
@@ -186,6 +187,9 @@ async def _setup_oidc_provider(hass: HomeAssistant, my_config: dict, display_nam
 
     force_https = features_config.get(FEATURES_FORCE_HTTPS, False)
     default_redirect = features_config.get(FEATURES_DEFAULT_REDIRECT, False)
+    disable_device_code_login = features_config.get(
+        FEATURES_DISABLE_DEVICE_CODE_LOGIN, False
+    )
 
     await hass.http.async_register_static_paths(
         [
@@ -214,13 +218,14 @@ async def _setup_oidc_provider(hass: HomeAssistant, my_config: dict, display_nam
                 force_https=force_https,
                 has_other_auth_providers=auth_provider_count > 0,
                 prefers_skipping=default_redirect or has_only_trusted_networks,
+                disable_device_code_login=disable_device_code_login,
             ),
         )
     )
     hass.http.register_view(OIDCDeviceSSE(provider))
     hass.http.register_view(OIDCRedirectView(oidc_client, provider, force_https))
     hass.http.register_view(OIDCCallbackView(oidc_client, provider, force_https))
-    hass.http.register_view(OIDCFinishView(provider))
+    hass.http.register_view(OIDCFinishView(provider, disable_device_code_login))
 
     _LOGGER.info("Registered OIDC views")
 

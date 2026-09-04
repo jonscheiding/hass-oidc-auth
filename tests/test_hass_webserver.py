@@ -12,6 +12,7 @@ from auth_oidc.config.const import (
     CLIENT_ID,
     FEATURES,
     FEATURES_DEFAULT_REDIRECT,
+    FEATURES_DISABLE_DEVICE_CODE_LOGIN,
 )
 
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
@@ -70,6 +71,7 @@ def encode_redirect_uri(redirect_uri: str) -> str:
 
 async def setup(
     hass: HomeAssistant,
+    features: dict | None = None,
 ):
     mock_config = {
         DOMAIN: {
@@ -77,6 +79,9 @@ async def setup(
             DISCOVERY_URL: "https://example.com/.well-known/openid-configuration",
         }
     }
+
+    if features:
+        mock_config[DOMAIN][FEATURES] = features
 
     result = await async_setup_component(hass, DOMAIN, mock_config)
     assert result
@@ -133,16 +138,7 @@ async def test_welcome_page_default_redirect(
 ):
     """Test that the welcome page returns a redirect when default_redirect is preferred."""
 
-    mock_config = {
-        DOMAIN: {
-            CLIENT_ID: "dummy",
-            DISCOVERY_URL: "https://example.com/.well-known/openid-configuration",
-            FEATURES: {FEATURES_DEFAULT_REDIRECT: True},
-        }
-    }
-
-    result = await async_setup_component(hass, DOMAIN, mock_config)
-    assert result
+    await setup(hass, {FEATURES_DEFAULT_REDIRECT: True})
 
     client = await hass_client()
     resp = await client.get("/auth/oidc/welcome", allow_redirects=False)
@@ -360,6 +356,30 @@ async def test_welcome_mobile_device_code_generation_failure(
         assert (
             "Failed to generate device code, please restart login." in await resp.text()
         )
+
+
+@pytest.mark.asyncio
+async def test_welcome_shows_message_to_mobile_when_device_code_login_disabled(
+    hass: HomeAssistant, hass_client: ClientSessionGenerator
+):
+    """Welcome should tell mobile clients when device code login is unavailable."""
+    await setup(hass, {FEATURES_DISABLE_DEVICE_CODE_LOGIN: True})
+
+    client = await hass_client()
+    redirect_uri = create_redirect_uri(MOBILE_CLIENT_ID, get_test_origin(client))
+    encoded = encode_redirect_uri(redirect_uri)
+
+    resp = await client.get(
+        f"/auth/oidc/welcome?redirect_uri={encoded}",
+        allow_redirects=False,
+    )
+    assert resp.status == 200
+    text = await resp.text()
+    assert 'id="device-code-disabled"' in text
+
+    # No code should be handed out, so there is also nothing to listen for
+    assert 'id="device-code"' not in text
+    assert "/auth/oidc/device-sse" not in text
 
 
 @pytest.mark.asyncio
@@ -673,6 +693,104 @@ async def test_finish_post_rejects_invalid_state(
         resp = await client.post("/auth/oidc/finish", allow_redirects=False)
         assert resp.status == 400
         assert "Invalid state, please restart login." in await resp.text()
+
+
+@pytest.mark.asyncio
+async def test_finish_offers_device_code_login_by_default(
+    hass: HomeAssistant, hass_client: ClientSessionGenerator
+):
+    """Finish GET should render the finish screen with the device code option."""
+    await setup(hass)
+
+    client = await hass_client()
+    redirect_uri = create_redirect_uri(client.make_url("/"), get_test_origin(client))
+    encoded = encode_redirect_uri(redirect_uri)
+    await client.get(
+        f"/auth/oidc/welcome?redirect_uri={encoded}",
+        allow_redirects=False,
+    )
+
+    resp = await client.get("/auth/oidc/finish", allow_redirects=False)
+    assert resp.status == 200
+    assert 'id="continue-on-this-device"' in await resp.text()
+
+
+@pytest.mark.asyncio
+async def test_finish_skips_screen_when_device_code_login_disabled(
+    hass: HomeAssistant, hass_client: ClientSessionGenerator
+):
+    """Finish GET should continue the login directly without device code login."""
+    await setup(hass, {FEATURES_DISABLE_DEVICE_CODE_LOGIN: True})
+
+    client = await hass_client()
+    redirect_uri = create_redirect_uri(client.make_url("/"), get_test_origin(client))
+    encoded = encode_redirect_uri(redirect_uri)
+    await client.get(
+        f"/auth/oidc/welcome?redirect_uri={encoded}",
+        allow_redirects=False,
+    )
+
+    resp = await client.get("/auth/oidc/finish", allow_redirects=False)
+    assert resp.status == 302
+
+    # Should behave exactly as pressing 'Continue on this device' on the finish screen
+    parsed_location = urlparse(resp.headers["Location"])
+    assert parsed_location.path == "/auth/authorize"
+    assert parse_qs(parsed_location.query)["skip_oidc_redirect"] == ["true"]
+
+
+@pytest.mark.asyncio
+async def test_finish_get_rejects_invalid_state_when_device_code_login_disabled(
+    hass: HomeAssistant, hass_client: ClientSessionGenerator
+):
+    """Finish GET should error when continuing and the state has no redirect_uri."""
+    await setup(hass, {FEATURES_DISABLE_DEVICE_CODE_LOGIN: True})
+
+    client = await hass_client()
+    redirect_uri = create_redirect_uri(client.make_url("/"), get_test_origin(client))
+    encoded = encode_redirect_uri(redirect_uri)
+    await client.get(
+        f"/auth/oidc/welcome?redirect_uri={encoded}",
+        allow_redirects=False,
+    )
+
+    with patch(
+        "custom_components.auth_oidc.provider.OpenIDAuthProvider.async_get_redirect_uri_for_state",
+        new=AsyncMock(return_value=None),
+    ):
+        resp = await client.get("/auth/oidc/finish", allow_redirects=False)
+        assert resp.status == 400
+        assert "Invalid state, please restart login." in await resp.text()
+
+
+@pytest.mark.asyncio
+async def test_finish_post_rejects_device_code_when_disabled(
+    hass: HomeAssistant, hass_client: ClientSessionGenerator
+):
+    """Finish POST should never approve a device code when the feature is disabled."""
+    await setup(hass, {FEATURES_DISABLE_DEVICE_CODE_LOGIN: True})
+
+    client = await hass_client()
+    redirect_uri = create_redirect_uri(client.make_url("/"), get_test_origin(client))
+    encoded = encode_redirect_uri(redirect_uri)
+    await client.get(
+        f"/auth/oidc/welcome?redirect_uri={encoded}",
+        allow_redirects=False,
+    )
+
+    with patch(
+        "custom_components.auth_oidc.provider.OpenIDAuthProvider.async_link_state_to_code",
+        new=AsyncMock(return_value=True),
+    ) as link_state_to_code:
+        resp = await client.post(
+            "/auth/oidc/finish",
+            data={"device_code": "456888"},
+            allow_redirects=False,
+        )
+
+    assert resp.status == 400
+    assert "Device code login is disabled, please restart login." in await resp.text()
+    link_state_to_code.assert_not_called()
 
 
 @pytest.mark.asyncio
