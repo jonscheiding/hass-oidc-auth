@@ -271,6 +271,18 @@ class OpenIDAuthProvider(AuthProvider):
 
         return None
 
+    def _get_credential_data(self, sub: str, meta: UserDetails) -> dict:
+        """Build the data to store on the user's credential for this login."""
+        data = {"sub": sub}
+
+        # Only store captured claims if any were configured, to leave the
+        # credentials of everyone else exactly as they were
+        claims = meta.get("claims")
+        if claims:
+            data["claims"] = claims
+
+        return data
+
     def get_cookie_header(self, state_id: str, secure: bool = False):
         """Get the cookie header to set the state_id cookie."""
         secure_flag = "; Secure" if secure else ""
@@ -362,12 +374,19 @@ class OpenIDAuthProvider(AuthProvider):
             # OpenID spec says that sub is the only claim we can rely on, as username
             # might change over time.
             if credential.data.get("sub") == sub:
+                # The captured claims may have changed at the provider since the
+                # last login, so write them again. This also removes them again
+                # for users that stop capturing claims.
+                data = self._get_credential_data(sub, meta)
+                if credential.data != data:
+                    self.store.async_update_user_credentials_data(credential, data)
+
                 return credential
 
         # If no credential was found, create a new one
         # Username cannot be supplied here as it won't be shown by Home Assistant regardless
         # Source: homeassistant/components/config/auth.py, line 162
-        credential = self.async_create_credentials({"sub": sub})
+        credential = self.async_create_credentials(self._get_credential_data(sub, meta))
 
         # If we have user linking enabled, try to link the user here
         if self.user_linking:

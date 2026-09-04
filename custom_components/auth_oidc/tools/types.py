@@ -16,6 +16,9 @@ class UserDetails(dict):
     username: str
     # Home Assistant role to assign to this user
     role: Literal["system-admin", "system-users", "invalid"]
+    # Claims captured from the id_token/userinfo as requested by claims.extra,
+    # to be stored on the user's credential. Empty unless configured.
+    claims: dict[str, object]
 
 
 class OIDCState(dict):

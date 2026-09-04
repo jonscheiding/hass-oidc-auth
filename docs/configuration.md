@@ -67,6 +67,51 @@ auth_oidc:
 
 If you configure the user role, OIDC users that have neither configured group name will be rejected! If you configure the admin role, users with that role will receive administrator rights in Home Assistant automatically upon login.
 
+### Capturing additional claims
+Apart from the claims that this integration uses itself (for the display name, username and groups), your provider may hand out claims that you would like to use elsewhere in Home Assistant, such as an email address to send notifications to. You can list those claims under `claims.extra` to have them stored on the user, for other integrations to use:
+
+```yaml
+auth_oidc:
+  additional_scopes:
+    - email
+  claims:
+    extra:
+      - email
+```
+
+Only the claims that you list are captured, all others are discarded. Claims are read from the id_token first and from the userinfo endpoint if your provider does not put them in the id_token. Note that you often have to request an extra scope to receive a claim at all, like the `email` scope above; a warning is logged upon login if a configured claim was not provided.
+
+The captured claims are stored on the user's OIDC credential, which lives in `.storage/auth`, and they are captured again upon every login, so they follow along when they change at your provider. Removing a claim from the configuration clears it upon the next login of each user. Integrations can read them from the credentials of a user:
+
+```python
+claims = next(
+    (
+        credential.data.get("claims", {})
+        for credential in user.credentials
+        if credential.auth_provider_type == "auth_oidc"
+    ),
+    {},
+)
+```
+
+> [!IMPORTANT]
+> Claims are only captured for users that login through OIDC, as they are stored on the OIDC credential. Users of other auth providers (such as the default Home Assistant login) do not get any.
+
+> [!CAUTION]
+> Captured claims are stored unencrypted, just like the rest of your Home Assistant configuration. Only list the claims that you actually intend to use, instead of everything your provider hands out.
+
+#### Using the subject from your provider
+This integration hashes the subject (`sub`) of your provider together with its issuer before using it as the identity of the user, so the subject that Home Assistant stores cannot be used to identify the user against the API of your provider. If you need the original subject, for example to call the API of your provider for the logged in user, you can capture it as a claim:
+
+```yaml
+auth_oidc:
+  claims:
+    extra:
+      - sub
+```
+
+The claim then holds the subject exactly as your provider issued it, while the hashed variant remains in use for the login itself.
+
 ### Configuring a display name for your OIDC provider
 If you would like to change the default name on the OIDC welcome screen and Home Assistant login screens from `OpenID Connect (SSO)` to your own display name, you can set the `display_name` configuration property.
 
@@ -179,6 +224,7 @@ Here's a table of all options that you can set:
 | `claims.display_name`      | `string` | No       | `name`                     | The claim to use to obtain the display name.
 | `claims.username`         | `string` | No       | `preferred_username`                     | The claim to use to obtain the username.
 | `claims.groups`            | `string` | No       | `groups`                     | The claim to use to obtain the user's group(s). |
+| `claims.extra`|`list of strings`| No        | `empty list`    | Claims to capture onto the user's OIDC credential for other integrations to use. Use `sub` to capture the subject as issued by your provider, which is hashed everywhere else. You may need to request additional scopes to receive the claims you list. |
 | `roles.admin`            | `string` | No       | `admins`                     | Group name to require for users to get the 'admin' role in Home Assistant. Defaults to 'admins', the default group name for admins in Authentik. Doesn't do anything if no groups claim is found in your token. |
 | `roles.user`            | `string` | No       |                     | Group name to require for users to get the 'user' role in Home Assistant. Defaults to giving all users this role, unless configured. |
 | `network.tls_verify`         | `boolean` | No       | `true`                     | Verify TLS certificate. You may want to set this to `false` when testing locally. |

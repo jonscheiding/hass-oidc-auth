@@ -18,6 +18,7 @@ from ..config.const import (
     CLAIMS_DISPLAY_NAME,
     CLAIMS_USERNAME,
     CLAIMS_GROUPS,
+    CLAIMS_EXTRA,
     ROLE_ADMINS,
     ROLE_USERS,
     NETWORK_TLS_VERIFY,
@@ -329,6 +330,7 @@ class OIDCClient:
         self.display_name_claim = claims.get(CLAIMS_DISPLAY_NAME, "name")
         self.username_claim = claims.get(CLAIMS_USERNAME, "preferred_username")
         self.groups_claim = claims.get(CLAIMS_GROUPS, "groups")
+        self.extra_claims = claims.get(CLAIMS_EXTRA, [])
         self.user_role = roles.get(ROLE_USERS, None)
         self.admin_role = roles.get(ROLE_ADMINS, "admins")
         self.tls_verify = network.get(NETWORK_TLS_VERIFY, True)
@@ -604,6 +606,9 @@ class OIDCClient:
                 self.groups_claim,
                 self.display_name_claim,
                 self.username_claim,
+                # Captured claims are often only available on the userinfo
+                # endpoint, like the 'email' claim on several providers
+                *self.extra_claims,
             ):
                 if claim not in id_token and claim in userinfo:
                     id_token[claim] = userinfo[claim]
@@ -622,6 +627,21 @@ class OIDCClient:
         if self.admin_role in groups:
             role = "system-admin"
 
+        # Capture the additional claims that were configured, if we received them.
+        # The values themselves are never logged, as they may contain personal
+        # information about the user.
+        captured_claims = {
+            claim: id_token[claim] for claim in self.extra_claims if claim in id_token
+        }
+
+        missing_claims = set(self.extra_claims) - set(captured_claims)
+        if missing_claims:
+            _LOGGER.warning(
+                "Configured claims were not provided by your OIDC provider: %s. "
+                + "You may need to request an additional scope to receive them.",
+                ", ".join(sorted(missing_claims)),
+            )
+
         # Create a user details dict based on the contents of the id_token & userinfo
         return {
             # Subject Identifier. A locally unique and never reassigned identifier within the
@@ -637,6 +657,10 @@ class OIDCClient:
             "username": id_token.get(self.username_claim),
             # Role
             "role": role,
+            # Additional claims to store on the user's credential, configurable.
+            # Note that 'sub' is the unmodified subject as issued by the provider
+            # here, not the hashed variant used above.
+            "claims": captured_claims,
         }
 
     async def async_complete_token_flow(

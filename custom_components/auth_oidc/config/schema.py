@@ -20,6 +20,7 @@ from .const import (
     CLAIMS_DISPLAY_NAME,
     CLAIMS_USERNAME,
     CLAIMS_GROUPS,
+    CLAIMS_EXTRA,
     ROLES,
     ROLE_ADMINS,
     ROLE_USERS,
@@ -95,6 +96,13 @@ CONFIG_SCHEMA = vol.Schema(
                         vol.Optional(CLAIMS_USERNAME): vol.Coerce(str),
                         # Which claim should we use to obtain the group(s) from OIDC?
                         vol.Optional(CLAIMS_GROUPS): vol.Coerce(str),
+                        # Which additional claims should we capture onto the
+                        # user's credential, for other integrations to use?
+                        # Optional, no claims are captured by default.
+                        # Note that 'sub' provides the unmodified subject as
+                        # issued by your provider, which is hashed everywhere
+                        # else in this integration.
+                        vol.Optional(CLAIMS_EXTRA): vol.Coerce(list[str]),
                     }
                 ),
                 # Determine which specific group values will be mapped to which roles

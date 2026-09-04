@@ -16,6 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://oidc.example.com"
 SUBJECT = "testuser"
+EMAIL = "testuser@example.com"
 
 
 class MockOIDCServer:
@@ -137,6 +138,7 @@ class MockOIDCServer:
             "nonce": query_params.get("nonce", [""])[0],
             "name": "Test Name",
             "preferred_username": username,
+            "email": self._scenario.get("email", EMAIL),
         }
 
         now = int(time.time())
@@ -157,6 +159,16 @@ class MockOIDCServer:
         key_set = KeySet([public_key])
 
         return key_set.as_dict(), 200
+
+    @staticmethod
+    def get_subject():
+        """Return the subject as issued by the provider."""
+        return SUBJECT
+
+    @staticmethod
+    def get_email():
+        """Return the email claim that's issued by the provider."""
+        return EMAIL
 
     @staticmethod
     def get_final_subject():

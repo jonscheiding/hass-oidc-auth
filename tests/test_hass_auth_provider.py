@@ -24,6 +24,8 @@ from custom_components.auth_oidc.config.const import (
     FEATURES,
     FEATURES_AUTOMATIC_PERSON_CREATION,
     FEATURES_AUTOMATIC_USER_LINKING,
+    CLAIMS,
+    CLAIMS_EXTRA,
 )
 from .mocks.oidc_server import MockOIDCServer, mock_oidc_responses
 
@@ -352,6 +354,122 @@ async def test_full_login(hass: HomeAssistant, hass_client):
         state_id2 = await get_login_state(hass, hass_client)
         user2 = await login_user(hass, state_id2)
         assert user2.id == user.id
+
+
+def set_login_claims(provider, sub: str, claims: dict) -> None:
+    """Stand in for a completed OIDC callback that captured these claims."""
+    # Received user details are held per subject until the credential is created
+    # pylint: disable=protected-access
+    provider._user_meta[sub] = {
+        "sub": sub,
+        "display_name": "Test Name",
+        "username": "testuser",
+        "role": "system-users",
+        "claims": claims,
+    }
+    # pylint: enable=protected-access
+
+
+@pytest.mark.asyncio
+async def test_login_stores_no_claims_by_default(hass: HomeAssistant, hass_client):
+    """Credentials should be left untouched when no claims are configured."""
+    await setup(
+        hass,
+        {
+            **DEFAULT_CONFIG,
+            FEATURES: {
+                FEATURES_AUTOMATIC_PERSON_CREATION: False,
+                FEATURES_AUTOMATIC_USER_LINKING: False,
+            },
+        },
+        True,
+    )
+
+    with mock_oidc_responses():
+        state_id = await get_login_state(hass, hass_client)
+        user = await login_user(hass, state_id)
+
+    assert user.credentials[0].data == {"sub": MockOIDCServer.get_final_subject()}
+
+
+@pytest.mark.asyncio
+async def test_login_captures_configured_claims(hass: HomeAssistant, hass_client):
+    """Configured claims should be captured onto the user's credential."""
+    await setup(
+        hass,
+        {
+            **DEFAULT_CONFIG,
+            FEATURES: {
+                FEATURES_AUTOMATIC_PERSON_CREATION: False,
+                FEATURES_AUTOMATIC_USER_LINKING: False,
+            },
+            CLAIMS: {CLAIMS_EXTRA: ["sub", "email"]},
+        },
+        True,
+    )
+
+    with mock_oidc_responses():
+        state_id = await get_login_state(hass, hass_client)
+        user = await login_user(hass, state_id)
+
+    credential = user.credentials[0]
+
+    # The captured subject is the one issued by the provider, so it can be used
+    # against the provider's own API, unlike the hashed subject we log in with
+    assert credential.data["claims"] == {
+        "sub": MockOIDCServer.get_subject(),
+        "email": MockOIDCServer.get_email(),
+    }
+    assert credential.data["sub"] == MockOIDCServer.get_final_subject()
+
+
+@pytest.mark.asyncio
+async def test_login_refreshes_captured_claims(hass: HomeAssistant):
+    """Claims should be captured again on every login, so they cannot go stale."""
+    await setup(
+        hass,
+        {**DEFAULT_CONFIG, CLAIMS: {CLAIMS_EXTRA: ["email"]}},
+        True,
+    )
+
+    provider = hass.auth.get_auth_providers(DOMAIN)[0]
+    sub = MockOIDCServer.get_final_subject()
+
+    set_login_claims(provider, sub, {"email": "old@example.com"})
+    credential = await provider.async_get_or_create_credentials({"sub": sub})
+    user = await hass.auth.async_get_or_create_user(credential)
+    assert credential.data["claims"] == {"email": "old@example.com"}
+
+    # Login again after the email changed at the provider
+    set_login_claims(provider, sub, {"email": "new@example.com"})
+    second_credential = await provider.async_get_or_create_credentials({"sub": sub})
+
+    assert second_credential.id == credential.id
+    assert user.credentials[0].data["claims"] == {"email": "new@example.com"}
+
+
+@pytest.mark.asyncio
+async def test_login_removes_claims_that_are_no_longer_captured(hass: HomeAssistant):
+    """Turning off claim capture should clear the claims on the next login."""
+    await setup(
+        hass,
+        {**DEFAULT_CONFIG, CLAIMS: {CLAIMS_EXTRA: ["email"]}},
+        True,
+    )
+
+    provider = hass.auth.get_auth_providers(DOMAIN)[0]
+    sub = MockOIDCServer.get_final_subject()
+
+    set_login_claims(provider, sub, {"email": "user@example.com"})
+    credential = await provider.async_get_or_create_credentials({"sub": sub})
+    user = await hass.auth.async_get_or_create_user(credential)
+    assert "claims" in credential.data
+
+    # Login again with the configuration option removed
+    set_login_claims(provider, sub, {})
+    await provider.async_get_or_create_credentials({"sub": sub})
+
+    assert user.credentials[0].data == {"sub": sub}
 
 
 @pytest.mark.asyncio

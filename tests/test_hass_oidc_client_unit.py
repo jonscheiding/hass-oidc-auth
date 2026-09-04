@@ -320,6 +320,103 @@ async def test_parse_user_details_admin_role_overrides_user_role(
 
 
 @pytest.mark.asyncio
+async def test_parse_user_details_captures_no_claims_by_default(hass: HomeAssistant):
+    """Claims should only be captured when they are explicitly configured."""
+    client = make_client(hass)
+
+    with patch.object(
+        client,
+        "_fetch_discovery_document",
+        new=AsyncMock(return_value={"issuer": "https://issuer"}),
+    ):
+        details = await client.parse_user_details(
+            {
+                "sub": "subject",
+                "name": "Display Name",
+                "preferred_username": "username",
+                "email": "user@example.com",
+            },
+            "access-token",
+        )
+
+    assert details["claims"] == {}
+
+
+@pytest.mark.asyncio
+async def test_parse_user_details_captures_configured_claims(hass: HomeAssistant):
+    """Configured claims should be captured, with 'sub' left unhashed."""
+    client = make_client(hass, claims={"extra": ["sub", "email"]})
+
+    with patch.object(
+        client,
+        "_fetch_discovery_document",
+        new=AsyncMock(return_value={"issuer": "https://issuer"}),
+    ):
+        details = await client.parse_user_details(
+            {
+                "sub": "subject",
+                "name": "Display Name",
+                "preferred_username": "username",
+                "email": "user@example.com",
+                "employee_id": "not-requested",
+            },
+            "access-token",
+        )
+
+    # The captured subject is the one issued by the provider, so it can be used
+    # to identify the user against the provider's own API
+    assert details["claims"] == {"sub": "subject", "email": "user@example.com"}
+    assert details["sub"] != "subject"
+
+
+@pytest.mark.asyncio
+async def test_parse_user_details_captures_claims_from_userinfo(hass: HomeAssistant):
+    """Captured claims that are missing from the id_token should come from userinfo."""
+    client = make_client(hass, claims={"extra": ["email"]})
+
+    with (
+        patch.object(
+            client,
+            "_fetch_discovery_document",
+            new=AsyncMock(
+                return_value={
+                    "issuer": "https://issuer",
+                    "userinfo_endpoint": "https://issuer/userinfo",
+                }
+            ),
+        ),
+        patch.object(
+            client,
+            "_get_userinfo",
+            new=AsyncMock(return_value={"email": "from-userinfo@example.com"}),
+        ),
+    ):
+        details = await client.parse_user_details({"sub": "subject"}, "access-token")
+
+    assert details["claims"] == {"email": "from-userinfo@example.com"}
+
+
+@pytest.mark.asyncio
+async def test_parse_user_details_omits_claims_that_were_not_provided(
+    hass: HomeAssistant,
+):
+    """Claims the provider does not hand out should be left out entirely."""
+    client = make_client(hass, claims={"extra": ["email"]})
+
+    with patch.object(
+        client,
+        "_fetch_discovery_document",
+        new=AsyncMock(return_value={"issuer": "https://issuer"}),
+    ):
+        details = await client.parse_user_details(
+            {"sub": "subject", "preferred_username": "username"},
+            "access-token",
+        )
+
+    assert details["claims"] == {}
+
+
+@pytest.mark.asyncio
 async def test_get_authorization_url_omits_pkce_when_disabled(
     hass: HomeAssistant,
 ):
