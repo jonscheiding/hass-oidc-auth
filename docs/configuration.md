@@ -100,6 +100,23 @@ claims = next(
 > [!CAUTION]
 > Captured claims are stored unencrypted, just like the rest of your Home Assistant configuration. Only list the claims that you actually intend to use, instead of everything your provider hands out.
 
+#### Reading claims from a client
+Applications that connect to Home Assistant, such as your own dashboard or app, can read the claims of the user they are logged in as over the websocket API:
+
+```json
+{ "id": 1, "type": "auth_oidc/user_claims" }
+```
+
+The command answers with the claims of the user of that connection, as `{"claims": {...}}`. It is therefore not limited to administrators; every user can read their own claims and nobody can read the claims of another user. Using [home-assistant-js-websocket](https://github.com/home-assistant/home-assistant-js-websocket), that becomes:
+
+```js
+const { claims } = await connection.sendMessagePromise({
+  type: "auth_oidc/user_claims",
+});
+```
+
+Note that you always get an empty object if the user signed in with another auth provider, or if you did not configure any claims to capture, so your application should handle missing claims.
+
 #### Using the subject from your provider
 This integration hashes the subject (`sub`) of your provider together with its issuer before using it as the identity of the user, so the subject that Home Assistant stores cannot be used to identify the user against the API of your provider. If you need the original subject, for example to call the API of your provider for the logged in user, you can capture it as a claim:
 

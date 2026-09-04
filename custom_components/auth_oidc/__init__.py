@@ -46,6 +46,7 @@ from .endpoints import (
 from .tools.oidc_client import OIDCClient
 from .tools.types import OIDCWelcomeOptions
 from .provider import OpenIDAuthProvider
+from .websocket import async_register_websocket_commands
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -222,6 +223,9 @@ async def _setup_oidc_provider(hass: HomeAssistant, my_config: dict, display_nam
     hass.http.register_view(OIDCFinishView(provider))
 
     _LOGGER.info("Registered OIDC views")
+
+    # Allow clients to read the claims that were captured for their own user
+    async_register_websocket_commands(hass)
 
     # Inject OIDC code into the frontend for /auth/authorize for automatic redirect
     await OIDCInjectedAuthPage.inject(
