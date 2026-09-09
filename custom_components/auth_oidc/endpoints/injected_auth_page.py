@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 
 from .welcome import PATH as WELCOME_PATH
 from ..provider import OpenIDAuthProvider
-from ..tools.helpers import get_url
+from ..tools.helpers import get_url, html_response
 
 PATH = "/auth/authorize"
 
@@ -188,4 +188,6 @@ class OIDCInjectedAuthPage(HomeAssistantView):
         if self._should_do_oidc_redirect(req):
             raise web.HTTPFound(location=self._get_welcome_redirect_location(req))
 
-        return web.Response(text=self.html, content_type="text/html")
+        # Carries the versioned injection script, so it must not be cached
+        # either — see html_response.
+        return html_response(self.html)

@@ -59,9 +59,22 @@ async def get_valid_state_id(
 
 
 def html_response(html: str, status: int = 200, headers=None) -> web.Response:
-    """Return an HTML response with the standard content type."""
+    """Return an HTML response with the standard content type.
+
+    None of these pages may be cached. They are short-lived and tied to the
+    state cookie, and their markup belongs to one specific version of this
+    integration: the stylesheet and injection script are versioned with a `?v=`
+    cache buster, so a browser that reuses an older copy of the HTML asks for
+    the older asset URL and renders the page unstyled. Without `no-store` an
+    upgrade can leave such a browser on a broken login page until the user
+    knows to hard-refresh, which is not something you can ask of end users.
+    """
     return web.Response(
-        text=html, content_type="text/html", status=status, headers=headers
+        text=html,
+        content_type="text/html",
+        status=status,
+        # Caller-supplied headers win, so a route can still override this.
+        headers={"cache-control": "no-store", **(headers or {})},
     )
 
 
