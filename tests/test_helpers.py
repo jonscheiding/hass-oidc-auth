@@ -118,6 +118,36 @@ async def test_html_response_and_template_helpers():
 
 
 @pytest.mark.asyncio
+async def test_html_responses_are_never_cached():
+    """HTML pages must not be cached; their markup is version-specific.
+
+    A browser holding an older copy requests the older `?v=` asset URLs and
+    renders the page unstyled, which only a hard refresh clears.
+    """
+    assert html_response("<p>ok</p>").headers["Cache-Control"] == "no-store"
+
+    with patch(
+        "custom_components.auth_oidc.tools.helpers.get_view",
+        new=AsyncMock(return_value="<p>rendered</p>"),
+    ):
+        rendered = await template_response("welcome", {})
+    assert rendered.headers["Cache-Control"] == "no-store"
+
+    # The error page keeps its state-cookie reset alongside the new header.
+    with patch(
+        "custom_components.auth_oidc.tools.helpers.get_view",
+        new=AsyncMock(return_value="<p>error</p>"),
+    ):
+        errored = await error_response("boom")
+    assert errored.headers["Cache-Control"] == "no-store"
+    assert "auth_oidc_state=" in errored.headers["Set-Cookie"]
+
+    # A caller that needs different caching can still say so.
+    overridden = html_response("<p>ok</p>", headers={"cache-control": "max-age=60"})
+    assert overridden.headers["Cache-Control"] == "max-age=60"
+
+
+@pytest.mark.asyncio
 async def test_error_response():
     """Error response helper should render the shared error template with status."""
     with patch(
