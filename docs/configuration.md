@@ -141,6 +141,30 @@ auth_oidc:
 
 This will show the provider on the login screen as: "Login with Example".
 
+### Changing the icon
+The pages this integration serves during login (the welcome screen, the finish screen and the error screen among them) show the icon of this integration above the card. You can replace it with your own through the `icon_url` configuration property:
+
+```yaml
+auth_oidc:
+  client_id: ""
+  discovery_url: ""
+  icon_url: "https://example.com/icon.png"
+```
+
+Both an absolute `http(s)` URL and a path on your own Home Assistant instance are accepted. If you would rather host the image yourself than depend on another server being up while you login, put it in the `www` folder of your Home Assistant configuration directory, which Home Assistant serves under `/local`:
+
+```yaml
+auth_oidc:
+  icon_url: "/local/icon.png"
+```
+
+With the image at `config/www/icon.png`, this shows it without any external request. Note that the `www` folder is served without authentication, as the login pages themselves are, so do not use an image that you would not want to be public.
+
+The icon is displayed at 56x56 pixels; a square image of 112x112 pixels or larger keeps it sharp on high resolution screens. Any format your browser can display works, such as PNG or SVG. If you do not set `icon_url`, the icon of this integration is used.
+
+> [!TIP]
+> Home Assistant caches files in the `www` folder aggressively. If you replace the image with a new one under the same name, add a version to the URL (`/local/icon.png?v=2`) so browsers pick it up.
+
 ### Skipping the welcome screen
 If you would like to skip the welcome screen, you can either enable the `features.default_redirect` feature, or [disable the Home Assistant auth provider](https://github.com/christiaangoossens/hass-oidc-auth/discussions/67).
 

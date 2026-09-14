@@ -6,12 +6,27 @@ from homeassistant.components import http
 from aiohttp import web
 
 from ..views.loader import AsyncTemplateRenderer
-from ..config.const import REPO_ROOT_URL
+from ..config.const import DEFAULT_ICON_URL, REPO_ROOT_URL
 
 if TYPE_CHECKING:
     from ..provider import OpenIDAuthProvider
 
 STATE_COOKIE_NAME = "auth_oidc_state"
+
+# Branding of the pages this integration serves. Only a single configuration of
+# this integration can be active at a time, so it is kept here instead of being
+# threaded through every view.
+_branding = {"icon_url": DEFAULT_ICON_URL}
+
+
+def set_icon_url(url: str | None) -> None:
+    """Set the icon shown on the pages this integration serves."""
+    _branding["icon_url"] = url.strip() if url and url.strip() else DEFAULT_ICON_URL
+
+
+def get_icon_url() -> str:
+    """Return the icon shown on the pages this integration serves."""
+    return _branding["icon_url"]
 
 
 def get_url(path: str, force_https: bool) -> str:
@@ -29,6 +44,10 @@ async def get_view(template: str, parameters: dict | None = None) -> str:
     """Returns the generated HTML of the requested view."""
     if parameters is None:
         parameters = {}
+
+    # Every page shows the icon, so it is provided here instead of by each
+    # caller. A caller may still pass its own to override it.
+    parameters = {"icon_url": get_icon_url(), **parameters}
 
     renderer = AsyncTemplateRenderer()
     return await renderer.render_template(f"{template}.html", **parameters)

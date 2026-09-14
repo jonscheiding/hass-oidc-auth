@@ -9,21 +9,24 @@ from aiohttp import web
 from custom_components.auth_oidc.tools.helpers import (
     STATE_COOKIE_NAME,
     error_response,
+    get_icon_url,
     get_state_id,
     get_url,
     get_valid_state_id,
     get_view,
     html_response,
+    set_icon_url,
     template_response,
 )
 from custom_components.auth_oidc.tools.validation import (
     validate_client_id,
     sanitize_client_secret,
     validate_discovery_url,
+    validate_icon_url,
     validate_url,
 )
 
-from custom_components.auth_oidc.config.const import REPO_ROOT_URL
+from custom_components.auth_oidc.config.const import DEFAULT_ICON_URL, REPO_ROOT_URL
 
 
 @pytest.mark.asyncio
@@ -208,3 +211,50 @@ async def test_client_id():
     assert not validate_client_id(" ")
     assert validate_client_id("test4")
     assert validate_client_id("test4 ")
+
+
+@pytest.mark.asyncio
+async def test_views_show_the_configured_icon():
+    """Every view should show the configured icon, or the default one."""
+    try:
+        assert get_icon_url() == DEFAULT_ICON_URL
+        assert f'src="{DEFAULT_ICON_URL}"' in await get_view("welcome")
+
+        set_icon_url("  https://example.com/icon.png  ")
+        assert get_icon_url() == "https://example.com/icon.png"
+        for template in ("welcome", "finish", "error"):
+            assert 'src="https://example.com/icon.png"' in await get_view(template)
+
+        # An empty configuration value falls back to the bundled icon
+        set_icon_url("")
+        assert get_icon_url() == DEFAULT_ICON_URL
+    finally:
+        set_icon_url(None)
+
+
+@pytest.mark.asyncio
+async def test_views_escape_the_configured_icon():
+    """The icon URL comes from the configuration, so it is escaped as any value."""
+    try:
+        set_icon_url('/local/icon.png" onerror="alert(1)')
+        rendered = await get_view("welcome")
+        assert 'onerror="alert(1)' not in rendered
+        assert "&#34; onerror=&#34;alert(1)" in rendered
+    finally:
+        set_icon_url(None)
+
+
+def test_validate_icon_url():
+    """Only http(s) URLs and paths on this instance are valid icons."""
+    assert validate_icon_url("https://example.com/icon.png")
+    assert validate_icon_url("http://example.com/icon.png")
+    assert validate_icon_url("/local/icon.png?v=2")
+    assert validate_icon_url("  /local/icon.png  ")
+
+    assert not validate_icon_url("")
+    assert not validate_icon_url("   ")
+    assert not validate_icon_url("//example.com/icon.png")
+    assert not validate_icon_url("javascript:alert(1)")
+    assert not validate_icon_url("data:image/png;base64,AAAA")
+    assert not validate_icon_url("local/icon.png")
+    assert not validate_icon_url(None)
