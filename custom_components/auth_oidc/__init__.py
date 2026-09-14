@@ -20,6 +20,7 @@ from .config import (
     CLIENT_SECRET,
     DISCOVERY_URL,
     DISPLAY_NAME,
+    ICON_URL,
     ID_TOKEN_SIGNING_ALGORITHM,
     GROUPS_SCOPE,
     ADDITIONAL_SCOPES,
@@ -43,6 +44,7 @@ from .endpoints import (
     OIDCInjectedAuthPage,
     OIDCDeviceSSE,
 )
+from .tools.helpers import set_icon_url
 from .tools.oidc_client import OIDCClient
 from .tools.types import OIDCWelcomeOptions
 from .provider import OpenIDAuthProvider
@@ -178,6 +180,9 @@ async def _setup_oidc_provider(hass: HomeAssistant, my_config: dict, display_nam
         roles=my_config.get(ROLES, {}),
         network=my_config.get(NETWORK, {}),
     )
+
+    # Apply the configured branding to every page we serve
+    set_icon_url(my_config.get(ICON_URL))
 
     # Register the views
     name = display_name

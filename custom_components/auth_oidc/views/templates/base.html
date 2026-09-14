@@ -19,7 +19,7 @@
     {% block layout %}
     <div class="w-full max-w-sm">
         <div class="flex items-center justify-center mb-8">
-            <img src="/auth/oidc/static/icon.png?v=2" alt="" class="h-14 w-14">
+            <img src="{{ icon_url }}" alt="" class="h-14 w-14">
         </div>
         <div class="bg-card text-foreground border border-divider rounded-xl p-4">
             {% block content %}{% endblock %}

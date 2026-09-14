@@ -1,11 +1,14 @@
 """Config schema"""
 
 import voluptuous as vol
+
+from ..tools.validation import validate_icon_url
 from .const import (
     CLIENT_ID,
     CLIENT_SECRET,
     DISCOVERY_URL,
     DISPLAY_NAME,
+    ICON_URL,
     ID_TOKEN_SIGNING_ALGORITHM,
     GROUPS_SCOPE,
     ADDITIONAL_SCOPES,
@@ -30,6 +33,18 @@ from .const import (
     DEFAULT_GROUPS_SCOPE,
 )
 
+
+def icon_url(value: str) -> str:
+    """Validate the configured icon URL."""
+    url = str(value).strip()
+    if not validate_icon_url(url):
+        raise vol.Invalid(
+            "icon_url must be an http(s) URL or a path on this Home Assistant "
+            "instance, such as /local/icon.png"
+        )
+    return url
+
+
 CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
@@ -42,6 +57,9 @@ CONFIG_SCHEMA = vol.Schema(
                 vol.Required(DISCOVERY_URL): vol.Coerce(str),
                 # Which name should be shown on the login screens?
                 vol.Optional(DISPLAY_NAME): vol.Coerce(str),
+                # Which icon should be shown on the pages of this integration?
+                # Defaults to the icon bundled with this integration.
+                vol.Optional(ICON_URL): icon_url,
                 # Should we enforce a specific signing algorithm on the id tokens?
                 # Defaults to RS256/RSA-pubkey
                 vol.Optional(ID_TOKEN_SIGNING_ALGORITHM): vol.Coerce(str),

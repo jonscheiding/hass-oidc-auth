@@ -18,6 +18,7 @@ CLIENT_ID = "client_id"
 CLIENT_SECRET = "client_secret"
 DISCOVERY_URL = "discovery_url"
 DISPLAY_NAME = "display_name"
+ICON_URL = "icon_url"
 ID_TOKEN_SIGNING_ALGORITHM = "id_token_signing_alg"
 GROUPS_SCOPE = "groups_scope"
 ADDITIONAL_SCOPES = "additional_scopes"
@@ -45,6 +46,11 @@ NETWORK_TLS_CA_PATH = "tls_ca_path"
 
 REQUIRED_SCOPES = "openid profile"
 DEFAULT_ID_TOKEN_SIGNING_ALGORITHM = "RS256"
+
+# The icon shown on the pages this integration serves, unless another one is
+# configured. Served from the bundled brand folder, with a cache buster as the
+# file is cached by browsers.
+DEFAULT_ICON_URL = "/auth/oidc/static/icon.png?v=2"
 
 DEFAULT_GROUPS_SCOPE = "groups"
 DEFAULT_ADMIN_GROUP = "admins"
